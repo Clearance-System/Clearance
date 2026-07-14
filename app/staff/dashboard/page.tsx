@@ -11,11 +11,19 @@ import { useAuth } from '@/context/AuthProvider';
 import { FileUpload } from '@/components/FileUpload';
 import {
   CheckCircle2, XCircle, Clock, Search, Eye, X,
-  Check, AlertTriangle, FileText, Users2, Signature,
+  Check, AlertTriangle, FileText, Users2, Signature, ChevronDown,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type FilterType = 'all' | 'pending' | 'approved' | 'rejected';
+
+const STAFF_ROLES = [
+  'Bursary',
+  'University Librarian',
+  'Director of Student Affairs',
+  'Faculty Dean',
+  'Hostel Officer',
+];
 
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
   return (
@@ -61,6 +69,13 @@ export default function StaffDashboard() {
   const [postHeld, setPostHeld] = useState(user?.post_held || '');
   const [faculty, setFaculty] = useState(user?.faculty || '');
   const [sigFile, setSigFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      setPostHeld(user.post_held || '');
+      setFaculty(user.faculty || '');
+    }
+  }, [user]);
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -384,12 +399,21 @@ export default function StaffDashboard() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Post Held *</label>
-                <input
-                  value={postHeld}
-                  onChange={(e) => setPostHeld(e.target.value)}
-                  placeholder="e.g. Senior Librarian, Bursary Officer"
-                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200"
-                />
+                <div className="relative">
+                  <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-zinc-500 pointer-events-none" />
+                  <select
+                    value={postHeld}
+                    onChange={(e) => setPostHeld(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200 appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Select Role/Post</option>
+                    {STAFF_ROLES.map((role) => (
+                      <option key={role} value={role} className="bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Faculty (optional)</label>
