@@ -6,6 +6,7 @@ import {
   approveDocument,
   rejectDocument,
   updateStaffProfile,
+  getStaffProfile,
 } from '@/api/staff';
 import { useAuth } from '@/context/AuthProvider';
 import { FileUpload } from '@/components/FileUpload';
@@ -68,14 +69,25 @@ export default function StaffDashboard() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [postHeld, setPostHeld] = useState(user?.post_held || '');
   const [faculty, setFaculty] = useState(user?.faculty || '');
+  const [staffId, setStaffId] = useState(user?.staff_id || '');
   const [sigFile, setSigFile] = useState<File | null>(null);
 
+  // Fetch live staff profile from API for accurate modal pre-fill
+  const { data: profileData } = useQuery({
+    queryKey: ['staffProfile'],
+    queryFn: getStaffProfile,
+    retry: 1,
+  });
+
+  // Sync modal fields: prefer live API profile data, fall back to auth context
   useEffect(() => {
-    if (user) {
-      setPostHeld(user.post_held || '');
-      setFaculty(user.faculty || '');
+    const source = profileData || user;
+    if (source) {
+      setPostHeld(source.post_held || '');
+      setFaculty(source.faculty || '');
+      setStaffId(source.staff_id || '');
     }
-  }, [user]);
+  }, [profileData, user]);
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -119,14 +131,19 @@ export default function StaffDashboard() {
   // Update staff profile (signature + post_held + faculty)
   const profileMutation = useMutation({
     mutationFn: () => {
+      const isCompleted = !!(profileData?.profile_completed || user?.profile_completed);
       if (!sigFile) throw new Error('Please select a signature image.');
-      const id = user?.id || user?._id || '';
-      if (!id) throw new Error('Staff ID not found. Please log out and log in again.');
-      return updateStaffProfile({ staff_id: id, post_held: postHeld, faculty, signature: sigFile });
+      if (!isCompleted) {
+        if (!staffId.trim()) throw new Error('Staff ID is required.');
+        if (!postHeld.trim()) throw new Error('Post Held is required.');
+        if (!faculty.trim()) throw new Error('Faculty is required.');
+      }
+      return updateStaffProfile({ staff_id: staffId, post_held: postHeld, faculty, signature: sigFile });
     },
     onSuccess: () => {
       setProfileOpen(false);
       setSigFile(null);
+      queryClient.invalidateQueries({ queryKey: ['staffProfile'] });
       showToast('Profile updated successfully!', 'success');
     },
     onError: (e: any) => showToast(e?.response?.data?.detail || e?.message || 'Profile update failed.', 'error'),
@@ -386,69 +403,95 @@ export default function StaffDashboard() {
       )}
 
       {/* ── Profile / Signature Modal ── */}
-      {profileOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ animation: 'scaleUp .25s ease' }}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-              <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Update Profile & Signature</h3>
-              <button onClick={() => setProfileOpen(false)}
-                className="p-1.5 rounded-full text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Post Held *</label>
-                <div className="relative">
-                  <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-zinc-500 pointer-events-none" />
-                  <select
-                    value={postHeld}
-                    onChange={(e) => setPostHeld(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200 appearance-none cursor-pointer"
-                  >
-                    <option value="" disabled>Select Role/Post</option>
-                    {STAFF_ROLES.map((role) => (
-                      <option key={role} value={role} className="bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
-                        {role}
-                      </option>
-                    ))}
-                  </select>
+      {profileOpen && (() => {
+        const isCompleted = !!(profileData?.profile_completed || user?.profile_completed);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl" style={{ animation: 'scaleUp .25s ease' }}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
+                <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                  {isCompleted ? 'Update Signature' : 'Complete Profile & Signature'}
+                </h3>
+                <button onClick={() => setProfileOpen(false)}
+                  className="p-1.5 rounded-full text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                {isCompleted && (
+                  <div className="p-3 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs text-zinc-500 dark:text-zinc-400">
+                    Your profile information has been locked. You can only update your authorization signature image.
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Staff ID *</label>
+                  <input
+                    value={staffId}
+                    onChange={(e) => setStaffId(e.target.value)}
+                    disabled={isCompleted}
+                    placeholder="e.g. STF-12345"
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Post Held *</label>
+                  <div className="relative">
+                    <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-zinc-500 pointer-events-none" />
+                    <select
+                      value={postHeld}
+                      onChange={(e) => setPostHeld(e.target.value)}
+                      disabled={isCompleted}
+                      className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200 appearance-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="" disabled>Select Role/Post</option>
+                      {STAFF_ROLES.map((role) => (
+                        <option key={role} value={role} className="bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Faculty *</label>
+                  <input
+                    value={faculty}
+                    onChange={(e) => setFaculty(e.target.value)}
+                    disabled={isCompleted}
+                    placeholder="e.g. Faculty of Engineering"
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Signature Image *</label>
+                  <FileUpload
+                    onFileSelect={(f) => setSigFile(f)}
+                    label="Upload signature image"
+                    accept={{ 'image/*': ['.png', '.jpg', '.jpeg'] }}
+                  />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Faculty (optional)</label>
-                <input
-                  value={faculty}
-                  onChange={(e) => setFaculty(e.target.value)}
-                  placeholder="e.g. Faculty of Engineering"
-                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200"
-                />
+              <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 flex justify-end gap-3">
+                <button onClick={() => setProfileOpen(false)}
+                  className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-medium transition-colors">
+                  Cancel
+                </button>
+                <button
+                  disabled={
+                    profileMutation.isPending || 
+                    (!isCompleted && (!postHeld.trim() || !faculty.trim() || !staffId.trim())) || 
+                    !sigFile
+                  }
+                  onClick={() => profileMutation.mutate()}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-600/10"
+                >
+                  {profileMutation.isPending ? 'Saving…' : 'Save Profile'}
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Signature Image *</label>
-                <FileUpload
-                  onFileSelect={(f) => setSigFile(f)}
-                  label="Upload signature image"
-                  accept={{ 'image/*': ['.png', '.jpg', '.jpeg'] }}
-                />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 flex justify-end gap-3">
-              <button onClick={() => setProfileOpen(false)}
-                className="px-4 py-2 rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-medium transition-colors">
-                Cancel
-              </button>
-              <button
-                disabled={profileMutation.isPending || !postHeld.trim() || !sigFile}
-                onClick={() => profileMutation.mutate()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-600/10"
-              >
-                {profileMutation.isPending ? 'Saving…' : 'Save Profile'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

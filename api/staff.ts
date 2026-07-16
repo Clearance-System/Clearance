@@ -1,5 +1,11 @@
 import apiClient from './client';
 
+// GET /api/staff/profile — fetch the logged-in staff member's own profile
+export async function getStaffProfile() {
+  const response = await apiClient.get('/api/staff/profile');
+  return response.data;
+}
+
 // POST /api/staff/profile/update — multipart form data
 // Required: staff_id, post_held, signature (file); optional: faculty
 export async function updateStaffProfile(data: {

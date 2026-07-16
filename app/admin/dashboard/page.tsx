@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAllStudents, getStudentById, getUploadedStudentsList,
-  getStaffList, approveStaff, suspendStaff, unsuspendStaff, deleteStaff,
+  getStaffList, getStaffDetail, approveStaff, suspendStaff, unsuspendStaff, deleteStaff,
   getClearanceStatus, toggleClearance,
   uploadStudentsFile, exportCompletedClearances,
 } from '@/api/admin';
@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const [staffSearch, setStaffSearch] = useState('');
   const [studentSubTab, setStudentSubTab] = useState<'registered' | 'master'>('registered');
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -74,6 +75,13 @@ export default function AdminDashboard() {
     queryKey: ['studentDetail', selectedStudent],
     queryFn: () => getStudentById(selectedStudent!),
     enabled: !!selectedStudent,
+    retry: 1,
+  });
+
+  const { data: staffDetail } = useQuery({
+    queryKey: ['staffDetail', selectedStaff],
+    queryFn: () => getStaffDetail(selectedStaff!),
+    enabled: !!selectedStaff,
     retry: 1,
   });
 
@@ -491,50 +499,98 @@ export default function AdminDashboard() {
                     const id = staff._id || staff.id;
                     const isSuspended = staff.is_suspended;
                     const isApproved = staff.is_approved;
+                    const isExpanded = selectedStaff === id;
                     return (
-                      <tr key={id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-zinc-800 dark:text-zinc-200">
-                            {staff.title} {staff.first_name} {staff.last_name}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 text-xs">{staff.email}</td>
-                        <td className="px-5 py-4 text-xs text-zinc-600 dark:text-zinc-400">{staff.post_held || '—'}</td>
-                        <td className="px-5 py-4">
-                          {isSuspended
-                            ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/20"><ShieldOff className="w-3 h-3" />Suspended</span>
-                            : isApproved
-                            ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20"><CheckCircle2 className="w-3 h-3" />Active</span>
-                            : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20"><Clock className="w-3 h-3" />Pending</span>
-                          }
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-end gap-2 flex-wrap">
-                            {!isApproved && !isSuspended && (
-                              <button onClick={() => approveMutation.mutate(id)} disabled={approveMutation.isPending}
-                                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all">
-                                Approve
+                      <>
+                        <tr key={id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-zinc-800 dark:text-zinc-200">
+                              {staff.title} {staff.first_name} {staff.last_name}
+                            </p>
+                          </td>
+                          <td className="px-5 py-4 text-xs">{staff.email}</td>
+                          <td className="px-5 py-4 text-xs text-zinc-600 dark:text-zinc-400">{staff.post_held || '—'}</td>
+                          <td className="px-5 py-4">
+                            {isSuspended
+                              ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/20"><ShieldOff className="w-3 h-3" />Suspended</span>
+                              : isApproved
+                              ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20"><CheckCircle2 className="w-3 h-3" />Active</span>
+                              : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20"><Clock className="w-3 h-3" />Pending</span>
+                            }
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center justify-end gap-2 flex-wrap">
+                              <button
+                                onClick={() => setSelectedStaff(isExpanded ? null : id)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all"
+                              >
+                                <Eye className="w-3.5 h-3.5" />{isExpanded ? 'Hide' : 'Details'}
                               </button>
-                            )}
-                            {isApproved && !isSuspended && (
-                              <button onClick={() => suspendMutation.mutate(id)} disabled={suspendMutation.isPending}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-xs font-bold transition-all">
-                                <ShieldOff className="w-3.5 h-3.5" />Suspend
+                              {!isApproved && !isSuspended && (
+                                <button onClick={() => approveMutation.mutate(id)} disabled={approveMutation.isPending}
+                                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all">
+                                  Approve
+                                </button>
+                              )}
+                              {isApproved && !isSuspended && (
+                                <button onClick={() => suspendMutation.mutate(id)} disabled={suspendMutation.isPending}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-xs font-bold transition-all">
+                                  <ShieldOff className="w-3.5 h-3.5" />Suspend
+                                </button>
+                              )}
+                              {isSuspended && (
+                                <button onClick={() => unsuspendMutation.mutate(id)} disabled={unsuspendMutation.isPending}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all">
+                                  <ShieldAlert className="w-3.5 h-3.5" />Unsuspend
+                                </button>
+                              )}
+                              <button onClick={() => setDeleteConfirm(id)}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all">
+                                <Trash2 className="w-3.5 h-3.5" />Delete
                               </button>
-                            )}
-                            {isSuspended && (
-                              <button onClick={() => unsuspendMutation.mutate(id)} disabled={unsuspendMutation.isPending}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all">
-                                <ShieldAlert className="w-3.5 h-3.5" />Unsuspend
-                              </button>
-                            )}
-                            <button onClick={() => setDeleteConfirm(id)}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all">
-                              <Trash2 className="w-3.5 h-3.5" />Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && staffDetail && (
+                          <tr key={`detail-${id}`}>
+                            <td colSpan={5} className="px-5 pb-4">
+                              <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
+                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4">Staff Profile Detail</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                  <div>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Full Name</p>
+                                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{staffDetail.title} {staffDetail.first_name} {staffDetail.last_name}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Email</p>
+                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.email}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Post Held</p>
+                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.post_held || '—'}</p>
+                                  </div>
+                                  {staffDetail.faculty && (
+                                    <div>
+                                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Faculty</p>
+                                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.faculty}</p>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Staff ID</p>
+                                    <p className="text-xs font-mono text-zinc-500">{staffDetail.staff_id || staffDetail._id || id}</p>
+                                  </div>
+                                  {staffDetail.signature_url && (
+                                    <div>
+                                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Signature</p>
+                                      <img src={staffDetail.signature_url} alt="Staff Signature" className="h-12 object-contain border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white p-1" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     );
                   })}
                 </tbody>

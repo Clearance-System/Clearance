@@ -24,6 +24,12 @@ export async function getStaffList() {
   return response.data;
 }
 
+// GET /api/admin/staff/{staff_id} — get single staff member detail
+export async function getStaffDetail(staffId: string) {
+  const response = await apiClient.get(`/api/admin/staff/${staffId}`);
+  return response.data;
+}
+
 // PATCH /api/admin/staff/{staff_id}/approve — approve a staff member
 export async function approveStaff(staffId: string) {
   const response = await apiClient.patch(`/api/admin/staff/${staffId}/approve`);

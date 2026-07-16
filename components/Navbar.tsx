@@ -25,6 +25,7 @@ export function Navbar() {
     ],
     staff: [
       { name: 'Dashboard', href: '/staff/dashboard', icon: Users2 },
+      { name: 'Profile', href: '/staff/profile', icon: UserIcon },
     ],
     admin: [
       { name: 'Dashboard', href: '/admin/dashboard', icon: ShieldAlert },
