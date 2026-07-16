@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAllStudents, getStudentById, getUploadedStudentsList,
@@ -92,8 +94,8 @@ export default function AdminDashboard() {
   const totalStudents = allStudents.length;
   const clearedStudents = allStudents.filter((s) => s.clearance_status === 'cleared').length;
   const pendingStudents = allStudents.filter((s) => s.clearance_status === 'pending' || !s.clearance_status).length;
-  const approvedStaff = allStaff.filter((s) => s.is_approved).length;
-  const pendingStaff = allStaff.filter((s) => !s.is_approved).length;
+  const approvedStaff = allStaff.filter((s) => s.approved).length;
+  const pendingStaff = allStaff.filter((s) => !s.approved).length;
 
   // ── Mutations ──
   const toggleMutation = useMutation({
@@ -217,18 +219,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex space-x-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-2xl mb-8">
+      <div className="flex overflow-x-auto scrollbar-hide space-x-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-2xl mb-8 min-w-0">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 flex-1 justify-center px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 flex-shrink-0 sm:flex-1 justify-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeTab === id
                 ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Icon className="w-4 h-4" />{label}
+            <Icon className="w-4 h-4 flex-shrink-0" /><span className="whitespace-nowrap">{label}</span>
           </button>
         ))}
       </div>
@@ -261,7 +263,7 @@ export default function AdminDashboard() {
                 Pending Staff Approvals ({pendingStaff})
               </h3>
               <div className="space-y-3">
-                {allStaff.filter((s) => !s.is_approved).slice(0, 5).map((staff: any) => (
+                {allStaff.filter((s) => !s.approved).slice(0, 5).map((staff: any) => (
                   <div key={staff._id || staff.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-100 dark:border-zinc-800">
                     <div>
                       <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
@@ -387,8 +389,9 @@ export default function AdminDashboard() {
                 No students found.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="overflow-x-auto -mx-1">
+                {/* Desktop table */}
+                <table className="hidden md:table w-full text-left text-sm text-zinc-500 dark:text-zinc-400">
                   <thead className="text-xs text-zinc-600 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-950/40">
                     <tr>
                       <th className="px-5 py-3.5 font-bold">Name</th>
@@ -400,59 +403,97 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                    {filteredStudents.map((student: any) => (
-                      <>
-                        <tr key={student._id || student.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                          <td className="px-5 py-4 font-semibold text-zinc-800 dark:text-zinc-200">{student.name}</td>
-                          <td className="px-5 py-4 font-mono text-xs">{student.matric_number}</td>
-                          <td className="px-5 py-4 text-xs">{student.faculty}</td>
-                          <td className="px-5 py-4 text-xs">{student.department}</td>
-                          <td className="px-5 py-4">
-                            {student.clearance_status === 'cleared'
-                              ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20"><CheckCircle2 className="w-3 h-3" />Cleared</span>
-                              : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20"><Clock className="w-3 h-3" />{student.clearance_status || 'Pending'}</span>
-                            }
-                          </td>
-                          <td className="px-5 py-4 text-right">
-                            <button
-                              onClick={() => setSelectedStudent(selectedStudent === (student._id || student.id) ? null : (student._id || student.id))}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              {selectedStudent === (student._id || student.id) ? 'Hide' : 'Details'}
-                            </button>
-                          </td>
-                        </tr>
-                        {/* Expandable detail row */}
-                        {selectedStudent === (student._id || student.id) && studentDetail && (
-                          <tr key={`detail-${student._id || student.id}`}>
-                            <td colSpan={6} className="px-5 pb-4">
-                              <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
-                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Clearance Documents</p>
-                                {studentDetail.documents?.length > 0 ? (
-                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {studentDetail.documents.map((doc: any) => (
-                                      <div key={doc._id || doc.id} className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                                        <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-1">
-                                          {(doc.document_type || '').replace(/_/g, ' ')}
-                                        </p>
-                                        {doc.status === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
-                                        {doc.status === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
-                                        {doc.status === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-zinc-400">No documents uploaded yet.</p>
-                                )}
-                              </div>
+                    {filteredStudents.map((student: any) => {
+                      const sid = student._id || student.id;
+                      return (
+                        <React.Fragment key={sid}>
+                          <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                            <td className="px-5 py-4 font-semibold text-zinc-800 dark:text-zinc-200">{student.name}</td>
+                            <td className="px-5 py-4 font-mono text-xs">{student.matric_number}</td>
+                            <td className="px-5 py-4 text-xs">{student.faculty}</td>
+                            <td className="px-5 py-4 text-xs">{student.department}</td>
+                            <td className="px-5 py-4">
+                              {student.clearance_status === 'cleared'
+                                ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20"><CheckCircle2 className="w-3 h-3" />Cleared</span>
+                                : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20"><Clock className="w-3 h-3" />{student.clearance_status || 'Pending'}</span>
+                              }
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <button onClick={() => setSelectedStudent(selectedStudent === sid ? null : sid)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all">
+                                <Eye className="w-3.5 h-3.5" />{selectedStudent === sid ? 'Hide' : 'Details'}
+                              </button>
                             </td>
                           </tr>
-                        )}
-                      </>
-                    ))}
+                          {selectedStudent === sid && studentDetail && (
+                            <tr>
+                              <td colSpan={6} className="px-5 pb-4">
+                                <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
+                                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Clearance Documents</p>
+                                  {studentDetail.documents?.length > 0 ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                      {studentDetail.documents.map((doc: any) => (
+                                        <div key={doc._id || doc.id} className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                                          <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-1">{(doc.document_type || '').replace(/_/g, ' ')}</p>
+                                          {doc.status === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
+                                          {doc.status === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
+                                          {doc.status === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : <p className="text-xs text-zinc-400">No documents uploaded yet.</p>}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
+                {/* Mobile cards */}
+                <div className="md:hidden space-y-3 px-1">
+                  {filteredStudents.map((student: any) => {
+                    const sid = student._id || student.id;
+                    return (
+                      <div key={sid} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div>
+                            <p className="font-semibold text-zinc-800 dark:text-zinc-200">{student.name}</p>
+                            <p className="font-mono text-xs text-zinc-500 mt-0.5">{student.matric_number}</p>
+                          </div>
+                          {student.clearance_status === 'cleared'
+                            ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 flex-shrink-0"><CheckCircle2 className="w-3 h-3" />Cleared</span>
+                            : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 flex-shrink-0"><Clock className="w-3 h-3" />{student.clearance_status || 'Pending'}</span>
+                          }
+                        </div>
+                        <p className="text-xs text-zinc-400 mb-1">{student.faculty}</p>
+                        <p className="text-xs text-zinc-400 mb-3">{student.department}</p>
+                        <button onClick={() => setSelectedStudent(selectedStudent === sid ? null : sid)}
+                          className="w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all">
+                          <Eye className="w-3.5 h-3.5" />{selectedStudent === sid ? 'Hide Details' : 'View Details'}
+                        </button>
+                        {selectedStudent === sid && studentDetail && (
+                          <div className="mt-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3">
+                            <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Clearance Documents</p>
+                            {studentDetail.documents?.length > 0 ? (
+                              <div className="grid grid-cols-2 gap-2">
+                                {studentDetail.documents.map((doc: any) => (
+                                  <div key={doc._id || doc.id} className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-0.5">{(doc.document_type || '').replace(/_/g, ' ')}</p>
+                                    {doc.status === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
+                                    {doc.status === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
+                                    {doc.status === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : <p className="text-xs text-zinc-400">No documents uploaded yet.</p>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )
           )}
@@ -461,20 +502,16 @@ export default function AdminDashboard() {
 
       {/* ── STAFF TAB ── */}
       {activeTab === 'staff' && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <h3 className="font-bold text-lg text-zinc-900 dark:text-white flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-indigo-500" />Staff Management ({allStaff.length})
             </h3>
-            <div className="relative w-full md:w-72">
+            <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search name or email…"
-                value={staffSearch}
+              <input type="text" placeholder="Search name or email…" value={staffSearch}
                 onChange={(e) => setStaffSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
+                className="w-full pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
             </div>
           </div>
 
@@ -483,119 +520,158 @@ export default function AdminDashboard() {
           ) : filteredStaff.length === 0 ? (
             <div className="text-center py-16 text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">No staff found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-zinc-500 dark:text-zinc-400">
-                <thead className="text-xs text-zinc-600 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-950/40">
-                  <tr>
-                    <th className="px-5 py-3.5 font-bold">Officer</th>
-                    <th className="px-5 py-3.5 font-bold">Email</th>
-                    <th className="px-5 py-3.5 font-bold">Post Held</th>
-                    <th className="px-5 py-3.5 font-bold">Status</th>
-                    <th className="px-5 py-3.5 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                  {filteredStaff.map((staff: any) => {
-                    const id = staff._id || staff.id;
-                    const isSuspended = staff.is_suspended;
-                    const isApproved = staff.is_approved;
-                    const isExpanded = selectedStaff === id;
-                    return (
-                      <>
-                        <tr key={id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-zinc-800 dark:text-zinc-200">
-                              {staff.title} {staff.first_name} {staff.last_name}
-                            </p>
-                          </td>
-                          <td className="px-5 py-4 text-xs">{staff.email}</td>
-                          <td className="px-5 py-4 text-xs text-zinc-600 dark:text-zinc-400">{staff.post_held || '—'}</td>
-                          <td className="px-5 py-4">
-                            {isSuspended
-                              ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/20"><ShieldOff className="w-3 h-3" />Suspended</span>
-                              : isApproved
-                              ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20"><CheckCircle2 className="w-3 h-3" />Active</span>
-                              : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20"><Clock className="w-3 h-3" />Pending</span>
-                            }
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center justify-end gap-2 flex-wrap">
-                              <button
-                                onClick={() => setSelectedStaff(isExpanded ? null : id)}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all"
-                              >
-                                <Eye className="w-3.5 h-3.5" />{isExpanded ? 'Hide' : 'Details'}
-                              </button>
-                              {!isApproved && !isSuspended && (
-                                <button onClick={() => approveMutation.mutate(id)} disabled={approveMutation.isPending}
-                                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all">
-                                  Approve
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-sm text-zinc-500 dark:text-zinc-400">
+                  <thead className="text-xs text-zinc-600 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-950/40">
+                    <tr>
+                      <th className="px-5 py-3.5 font-bold">Officer</th>
+                      <th className="px-5 py-3.5 font-bold">Email</th>
+                      <th className="px-5 py-3.5 font-bold">Post Held</th>
+                      <th className="px-5 py-3.5 font-bold">Status</th>
+                      <th className="px-5 py-3.5 font-bold text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    {filteredStaff.map((staff: any) => {
+                      const id = staff._id || staff.id;
+                      const isSuspended = staff.suspended;
+                      const isApproved = staff.approved;
+                      const isExpanded = selectedStaff === id;
+                      return (
+                        <React.Fragment key={id}>
+                          <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                            <td className="px-5 py-4">
+                              <p className="font-semibold text-zinc-800 dark:text-zinc-200">{staff.title} {staff.first_name} {staff.last_name}</p>
+                              {staff.profile_completed && <span className="text-[10px] text-emerald-500 font-semibold">Profile Complete</span>}
+                            </td>
+                            <td className="px-5 py-4 text-xs">{staff.email}</td>
+                            <td className="px-5 py-4 text-xs text-zinc-600 dark:text-zinc-400">{staff.post_held || '—'}</td>
+                            <td className="px-5 py-4">
+                              {isSuspended
+                                ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/20"><ShieldOff className="w-3 h-3" />Suspended</span>
+                                : isApproved
+                                ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20"><CheckCircle2 className="w-3 h-3" />Active</span>
+                                : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20"><Clock className="w-3 h-3" />Pending</span>
+                              }
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center justify-end gap-2 flex-wrap">
+                                <button onClick={() => setSelectedStaff(isExpanded ? null : id)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all">
+                                  <Eye className="w-3.5 h-3.5" />{isExpanded ? 'Hide' : 'Details'}
                                 </button>
-                              )}
-                              {isApproved && !isSuspended && (
-                                <button onClick={() => suspendMutation.mutate(id)} disabled={suspendMutation.isPending}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-xs font-bold transition-all">
-                                  <ShieldOff className="w-3.5 h-3.5" />Suspend
+                                {!isApproved && !isSuspended && (
+                                  <button onClick={() => approveMutation.mutate(id)} disabled={approveMutation.isPending}
+                                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all">Approve</button>
+                                )}
+                                {isApproved && !isSuspended && (
+                                  <button onClick={() => suspendMutation.mutate(id)} disabled={suspendMutation.isPending}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-xs font-bold transition-all">
+                                    <ShieldOff className="w-3.5 h-3.5" />Suspend
+                                  </button>
+                                )}
+                                {isSuspended && (
+                                  <button onClick={() => unsuspendMutation.mutate(id)} disabled={unsuspendMutation.isPending}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all">
+                                    <ShieldAlert className="w-3.5 h-3.5" />Unsuspend
+                                  </button>
+                                )}
+                                <button onClick={() => setDeleteConfirm(id)}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all">
+                                  <Trash2 className="w-3.5 h-3.5" />Delete
                                 </button>
-                              )}
-                              {isSuspended && (
-                                <button onClick={() => unsuspendMutation.mutate(id)} disabled={unsuspendMutation.isPending}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all">
-                                  <ShieldAlert className="w-3.5 h-3.5" />Unsuspend
-                                </button>
-                              )}
-                              <button onClick={() => setDeleteConfirm(id)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all">
-                                <Trash2 className="w-3.5 h-3.5" />Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {isExpanded && staffDetail && (
-                          <tr key={`detail-${id}`}>
-                            <td colSpan={5} className="px-5 pb-4">
-                              <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
-                                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4">Staff Profile Detail</p>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                  <div>
-                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Full Name</p>
-                                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{staffDetail.title} {staffDetail.first_name} {staffDetail.last_name}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Email</p>
-                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.email}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Post Held</p>
-                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.post_held || '—'}</p>
-                                  </div>
-                                  {staffDetail.faculty && (
-                                    <div>
-                                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Faculty</p>
-                                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.faculty}</p>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Staff ID</p>
-                                    <p className="text-xs font-mono text-zinc-500">{staffDetail.staff_id || staffDetail._id || id}</p>
-                                  </div>
-                                  {staffDetail.signature_url && (
-                                    <div>
-                                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Signature</p>
-                                      <img src={staffDetail.signature_url} alt="Staff Signature" className="h-12 object-contain border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white p-1" />
-                                    </div>
-                                  )}
-                                </div>
                               </div>
                             </td>
                           </tr>
+                          {isExpanded && staffDetail && (
+                            <tr>
+                              <td colSpan={5} className="px-5 pb-4">
+                                <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5">
+                                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4">Staff Profile Detail</p>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Full Name</p><p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{staffDetail.title} {staffDetail.first_name} {staffDetail.last_name}</p></div>
+                                    <div><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Email</p><p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.email}</p></div>
+                                    <div><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Post Held</p><p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.post_held || '—'}</p></div>
+                                    {staffDetail.faculty && <div><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Faculty</p><p className="text-sm text-zinc-600 dark:text-zinc-400">{staffDetail.faculty}</p></div>}
+                                    <div><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Staff ID</p><p className="text-xs font-mono text-zinc-500">{staffDetail.staff_id || staffDetail._id || id}</p></div>
+                                    {staffDetail.signature_url && <div><p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Signature</p><img src={staffDetail.signature_url} alt="Staff Signature" className="h-12 object-contain border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white p-1" /></div>}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile cards */}
+              <div className="md:hidden space-y-3">
+                {filteredStaff.map((staff: any) => {
+                  const id = staff._id || staff.id;
+                  const isSuspended = staff.suspended;
+                  const isApproved = staff.approved;
+                  const isExpanded = selectedStaff === id;
+                  return (
+                    <div key={id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">{staff.title} {staff.first_name} {staff.last_name}</p>
+                          <p className="text-xs text-zinc-400 truncate">{staff.email}</p>
+                          {staff.post_held && <p className="text-xs text-indigo-500 font-medium mt-0.5">{staff.post_held}</p>}
+                        </div>
+                        {isSuspended
+                          ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 flex-shrink-0"><ShieldOff className="w-3 h-3" />Suspended</span>
+                          : isApproved
+                          ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 flex-shrink-0"><CheckCircle2 className="w-3 h-3" />Active</span>
+                          : <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100 flex-shrink-0"><Clock className="w-3 h-3" />Pending</span>
+                        }
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <button onClick={() => setSelectedStaff(isExpanded ? null : id)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all">
+                          <Eye className="w-3.5 h-3.5" />{isExpanded ? 'Hide' : 'Details'}
+                        </button>
+                        {!isApproved && !isSuspended && (
+                          <button onClick={() => approveMutation.mutate(id)} disabled={approveMutation.isPending}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all">Approve</button>
                         )}
-                      </>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        {isApproved && !isSuspended && (
+                          <button onClick={() => suspendMutation.mutate(id)} disabled={suspendMutation.isPending}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-200 text-amber-600 text-xs font-bold transition-all">
+                            <ShieldOff className="w-3.5 h-3.5" />Suspend
+                          </button>
+                        )}
+                        {isSuspended && (
+                          <button onClick={() => unsuspendMutation.mutate(id)} disabled={unsuspendMutation.isPending}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-600 text-xs font-bold transition-all">
+                            <ShieldAlert className="w-3.5 h-3.5" />Unsuspend
+                          </button>
+                        )}
+                        <button onClick={() => setDeleteConfirm(id)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 text-xs font-bold transition-all">
+                          <Trash2 className="w-3.5 h-3.5" />Delete
+                        </button>
+                      </div>
+                      {isExpanded && staffDetail && (
+                        <div className="mt-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3">
+                          <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Profile Detail</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div><p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">Staff ID</p><p className="text-xs font-mono text-zinc-500">{staffDetail.staff_id || id}</p></div>
+                            <div><p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">Post Held</p><p className="text-xs text-zinc-600 dark:text-zinc-400">{staffDetail.post_held || '—'}</p></div>
+                            {staffDetail.faculty && <div className="col-span-2"><p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">Faculty</p><p className="text-xs text-zinc-600 dark:text-zinc-400">{staffDetail.faculty}</p></div>}
+                            {staffDetail.signature_url && <div className="col-span-2"><p className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5">Signature</p><img src={staffDetail.signature_url} alt="Signature" className="h-10 object-contain border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white p-1" /></div>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
