@@ -18,13 +18,16 @@ import {
 import { useState } from 'react';
 
 const DOC_TYPES = [
-  { id: 'bursary_receipt', name: 'Bursary Receipt' },
-  { id: 'library_clearance', name: 'Library Clearance Form' },
-  { id: 'alumni_receipt', name: 'Alumni Fee Receipt' },
-  { id: 'faculty_dues', name: 'Faculty Dues Receipt' },
-  { id: 'departmental_clearance', name: 'Departmental Clearance' },
-  { id: 'sports_clearance', name: 'Sports Council Clearance' },
-  { id: 'security_clearance', name: 'Security Unit Clearance' },
+  { id: 'School Fees Receipt', name: 'School Fees Receipt' },
+  { id: 'Acceptance Fee Receipt', name: 'Acceptance Fee Receipt' },
+  { id: 'Library Card', name: 'Library Card' },
+  { id: 'Student ID Card', name: 'Student ID Card' },
+  { id: 'Departmental Form', name: 'Departmental Form' },
+  { id: 'Hostel Clearance', name: 'Hostel Clearance' },
+  { id: 'Alumni Fee Receipt', name: 'Alumni Fee Receipt' },
+  { id: 'Faculty Dues Receipt', name: 'Faculty Dues Receipt' },
+  { id: 'Sports Council Clearance', name: 'Sports Council Clearance' },
+  { id: 'Security Clearance', name: 'Security Clearance' },
 ];
 
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
@@ -81,12 +84,13 @@ export default function StudentDashboard() {
   });
 
   const docs: any[] = documents || [];
-  const approved = docs.filter((d) => d.status === 'approved').length;
-  const pending = docs.filter((d) => d.status === 'pending').length;
-  const rejected = docs.filter((d) => d.status === 'rejected').length;
+  const approved = docs.filter((d) => d.status === 'approved' || d.status === 'Approved').length;
+  const pending = docs.filter((d) => d.status === 'pending' || d.status === 'Pending').length;
+  const rejected = docs.filter((d) => d.status === 'rejected' || d.status === 'Rejected').length;
   const total = docs.length;
-  const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
-  const isFullyCleared = total > 0 && approved === total;
+  const requiredCount = clearanceStatus?.required_count || 9;
+  const isFullyCleared = !!clearanceStatus?.all_approved || (approved >= requiredCount);
+  const pct = Math.min(100, Math.round((approved / requiredCount) * 100));
 
   // Upload signature
   const sigMutation = useMutation({
@@ -229,8 +233,11 @@ export default function StudentDashboard() {
                 ))}
               </select>
             </div>
+
             <FileUpload
-              onFileSelect={(f) => docMutation.mutate({ type: selectedDocType, file: f })}
+              onFileSelect={(f) => {
+                docMutation.mutate({ type: selectedDocType, file: f });
+              }}
               label={`Upload ${DOC_TYPES.find((d) => d.id === selectedDocType)?.name}`}
             />
             {docMutation.isPending && <p className="text-xs text-indigo-400 mt-2 animate-pulse">Uploading…</p>}

@@ -24,6 +24,9 @@ const STAFF_ROLES = [
   'Director of Student Affairs',
   'Faculty Dean',
   'Hostel Officer',
+  'Faculty Officer',
+  'Director Sport',
+  'Chief Security Officer',
 ];
 
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
@@ -136,9 +139,12 @@ export default function StaffDashboard() {
       if (!isCompleted) {
         if (!staffId.trim()) throw new Error('Staff ID is required.');
         if (!postHeld.trim()) throw new Error('Post Held is required.');
-        if (!faculty.trim()) throw new Error('Faculty is required.');
+        const isFacultyRequired = ['Faculty Dean', 'Faculty Officer'].includes(postHeld);
+        if (isFacultyRequired && !faculty.trim()) {
+          throw new Error('Faculty is required for this post.');
+        }
       }
-      return updateStaffProfile({ staff_id: staffId, post_held: postHeld, faculty, signature: sigFile });
+      return updateStaffProfile({ staff_id: staffId, post_held: postHeld, faculty: faculty.trim() || undefined, signature: sigFile });
     },
     onSuccess: () => {
       setProfileOpen(false);
@@ -453,7 +459,9 @@ export default function StaffDashboard() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Faculty *</label>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
+                    Faculty {['Faculty Dean', 'Faculty Officer'].includes(postHeld) ? '*' : '(optional)'}
+                  </label>
                   <input
                     value={faculty}
                     onChange={(e) => setFaculty(e.target.value)}
@@ -479,7 +487,11 @@ export default function StaffDashboard() {
                 <button
                   disabled={
                     profileMutation.isPending || 
-                    (!isCompleted && (!postHeld.trim() || !faculty.trim() || !staffId.trim())) || 
+                    (!isCompleted && (
+                      !postHeld.trim() || 
+                      !staffId.trim() || 
+                      ((['Faculty Dean', 'Faculty Officer'].includes(postHeld)) && !faculty.trim())
+                    )) || 
                     !sigFile
                   }
                   onClick={() => profileMutation.mutate()}
