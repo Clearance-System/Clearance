@@ -10,6 +10,7 @@ import {
 } from '@/api/staff';
 import { useAuth } from '@/context/AuthProvider';
 import { FileUpload } from '@/components/FileUpload';
+import { DocumentPreview } from '@/components/DocumentPreview';
 import {
   CheckCircle2, XCircle, Clock, Search, Eye, X,
   Check, AlertTriangle, FileText, Users2, Signature, ChevronDown,
@@ -39,12 +40,13 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === 'approved') return (
+  const normStatus = (status || '').toLowerCase();
+  if (normStatus === 'approved') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20">
       <CheckCircle2 className="w-3.5 h-3.5" />Approved
     </span>
   );
-  if (status === 'rejected') return (
+  if (normStatus === 'rejected') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/20">
       <XCircle className="w-3.5 h-3.5" />Rejected
     </span>
@@ -67,6 +69,7 @@ export default function StaffDashboard() {
   // Review modal state
   const [activeDoc, setActiveDoc] = useState<any | null>(null);
   const [remark, setRemark] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Profile setup modal state
   const [profileOpen, setProfileOpen] = useState(false);
@@ -157,7 +160,7 @@ export default function StaffDashboard() {
 
   // Filtered document list
   const filtered = docs.filter((d) => {
-    const matchFilter = filter === 'all' || d.status === filter;
+    const matchFilter = filter === 'all' || (d.status || '').toLowerCase() === filter;
     const q = search.toLowerCase();
     const matchSearch =
       !q ||
@@ -214,8 +217,8 @@ export default function StaffDashboard() {
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
           { label: 'Total Documents', val: docs.length, color: 'text-zinc-900 dark:text-white' },
-          { label: 'Pending Review', val: docs.filter(d => d.status === 'pending').length, color: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Reviewed', val: docs.filter(d => d.status !== 'pending').length, color: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'Pending Review', val: docs.filter(d => (d.status || '').toLowerCase() === 'pending').length, color: 'text-amber-600 dark:text-amber-400' },
+          { label: 'Reviewed', val: docs.filter(d => (d.status || '').toLowerCase() !== 'pending').length, color: 'text-emerald-600 dark:text-emerald-400' },
         ].map(({ label, val, color }) => (
           <div key={label} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm text-center">
             <p className={`text-2xl font-bold ${color}`}>{val}</p>
@@ -352,13 +355,26 @@ export default function StaffDashboard() {
                       Open in New Tab ↗
                     </a>
                   </div>
-                  <div className="bg-zinc-100 dark:bg-zinc-950/60 h-36 flex items-center justify-center">
-                    {activeDoc.file_url.match(/\.(png|jpg|jpeg|webp)$/i) ? (
-                      <img src={activeDoc.file_url} alt="Document" className="h-full object-contain" />
+                  <div className="bg-zinc-100 dark:bg-zinc-950/60 p-4 flex flex-col items-center justify-center min-h-[9rem]">
+                    {activeDoc.file_url.match(/\.(png|jpg|jpeg|webp|gif)$/i) ? (
+                      <div className="relative group cursor-pointer" onClick={() => setPreviewOpen(true)}>
+                        <img src={activeDoc.file_url} alt="Document" className="h-32 object-contain rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center transition-all">
+                          <span className="text-white text-xs font-semibold">Click to Zoom 🔍</span>
+                        </div>
+                      </div>
                     ) : (
-                      <div className="text-center text-zinc-400">
-                        <FileText className="w-10 h-10 mx-auto mb-2" />
-                        <p className="text-xs">PDF / Document — click "Open in New Tab" to view</p>
+                      <div className="text-center">
+                        <FileText className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+                        <p className="text-xs text-zinc-700 dark:text-zinc-350 font-medium mb-3">
+                          {activeDoc.document_type?.replace(/_/g, ' ')}
+                        </p>
+                        <button
+                          onClick={() => setPreviewOpen(true)}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/10 transition-all cursor-pointer"
+                        >
+                          Preview Document
+                        </button>
                       </div>
                     )}
                   </div>
@@ -504,6 +520,15 @@ export default function StaffDashboard() {
           </div>
         );
       })()}
+      {activeDoc && (
+        <DocumentPreview
+          isOpen={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          documentId={activeDoc._id || activeDoc.id}
+          fileUrl={activeDoc.file_url}
+          documentType={activeDoc.document_type || 'Document'}
+        />
+      )}
     </div>
   );
 }

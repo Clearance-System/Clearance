@@ -10,6 +10,7 @@ import {
   downloadClearanceSlip,
 } from '@/api/student';
 import { FileUpload } from '@/components/FileUpload';
+import { DocumentPreview } from '@/components/DocumentPreview';
 import { useAuth } from '@/context/AuthProvider';
 import {
   CheckCircle2, XCircle, Clock, FileDown, UploadCloud,
@@ -41,12 +42,13 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === 'approved') return (
+  const normStatus = (status || '').toLowerCase();
+  if (normStatus === 'approved') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20">
       <CheckCircle2 className="w-3.5 h-3.5" />Approved
     </span>
   );
-  if (status === 'rejected') return (
+  if (normStatus === 'rejected') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/20">
       <XCircle className="w-3.5 h-3.5" />Rejected
     </span>
@@ -63,6 +65,8 @@ export default function StudentDashboard() {
   const queryClient = useQueryClient();
   const [selectedDocType, setSelectedDocType] = useState(DOC_TYPES[0].id);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; url: string; type: string } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
@@ -84,9 +88,9 @@ export default function StudentDashboard() {
   });
 
   const docs: any[] = documents || [];
-  const approved = docs.filter((d) => d.status === 'approved' || d.status === 'Approved').length;
-  const pending = docs.filter((d) => d.status === 'pending' || d.status === 'Pending').length;
-  const rejected = docs.filter((d) => d.status === 'rejected' || d.status === 'Rejected').length;
+  const approved = docs.filter((d) => (d.status || '').toLowerCase() === 'approved').length;
+  const pending = docs.filter((d) => (d.status || '').toLowerCase() === 'pending').length;
+  const rejected = docs.filter((d) => (d.status || '').toLowerCase() === 'rejected').length;
   const total = docs.length;
   const requiredCount = clearanceStatus?.required_count || 9;
   const isFullyCleared = !!clearanceStatus?.all_approved || (approved >= requiredCount);
@@ -279,10 +283,19 @@ export default function StudentDashboard() {
                       </div>
                     )}
                     {doc.file_url && (
-                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1 text-xs text-indigo-500 hover:underline">
+                      <button
+                        onClick={() => {
+                          setPreviewDoc({
+                            id: doc.id || doc._id,
+                            url: doc.file_url,
+                            type: doc.document_type || doc.type || 'Document'
+                          });
+                          setPreviewOpen(true);
+                        }}
+                        className="mt-3 inline-flex items-center gap-1 text-xs text-indigo-500 hover:underline cursor-pointer"
+                      >
                         <FileText className="w-3.5 h-3.5" />View File
-                      </a>
+                      </button>
                     )}
                   </div>
                 ))}
@@ -323,6 +336,18 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+      {previewDoc && (
+        <DocumentPreview
+          isOpen={previewOpen}
+          onClose={() => {
+            setPreviewOpen(false);
+            setPreviewDoc(null);
+          }}
+          documentId={previewDoc.id}
+          fileUrl={previewDoc.url}
+          documentType={previewDoc.type}
+        />
+      )}
     </div>
   );
 }

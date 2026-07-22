@@ -10,6 +10,7 @@ import {
   uploadStudentsFile, exportCompletedClearances,
 } from '@/api/admin';
 import { FileUpload } from '@/components/FileUpload';
+import { DocumentPreview } from '@/components/DocumentPreview';
 import {
   CheckCircle2, XCircle, Clock, Search, Eye, X, Check,
   ShieldCheck, Users, Building2, FileDown, UploadCloud,
@@ -40,6 +41,8 @@ export default function AdminDashboard() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; url: string; type: string } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
@@ -432,14 +435,37 @@ export default function AdminDashboard() {
                                   <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Clearance Documents</p>
                                   {studentDetail.documents?.length > 0 ? (
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                      {studentDetail.documents.map((doc: any) => (
-                                        <div key={doc._id || doc.id} className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                                          <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-1">{(doc.document_type || '').replace(/_/g, ' ')}</p>
-                                          {doc.status === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
-                                          {doc.status === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
-                                          {doc.status === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
-                                        </div>
-                                      ))}
+                                      {studentDetail.documents.map((doc: any) => {
+                                        const statusLower = (doc.status || '').toLowerCase();
+                                        return (
+                                          <div key={doc._id || doc.id} className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
+                                            <div>
+                                              <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-1">{(doc.document_type || '').replace(/_/g, ' ')}</p>
+                                              <div className="flex items-center justify-between mt-2">
+                                                {statusLower === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
+                                                {statusLower === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
+                                                {statusLower === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
+                                                
+                                                {doc.file_url && (
+                                                  <button
+                                                    onClick={() => {
+                                                      setPreviewDoc({
+                                                        id: doc.id || doc._id,
+                                                        url: doc.file_url,
+                                                        type: doc.document_type || 'Document'
+                                                      });
+                                                      setPreviewOpen(true);
+                                                    }}
+                                                    className="inline-flex items-center gap-0.5 px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-750 dark:text-zinc-300 text-[10px] font-bold transition-all cursor-pointer"
+                                                  >
+                                                    View
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   ) : <p className="text-xs text-zinc-400">No documents uploaded yet.</p>}
                                 </div>
@@ -478,14 +504,37 @@ export default function AdminDashboard() {
                             <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Clearance Documents</p>
                             {studentDetail.documents?.length > 0 ? (
                               <div className="grid grid-cols-2 gap-2">
-                                {studentDetail.documents.map((doc: any) => (
-                                  <div key={doc._id || doc.id} className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-0.5">{(doc.document_type || '').replace(/_/g, ' ')}</p>
-                                    {doc.status === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
-                                    {doc.status === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
-                                    {doc.status === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
-                                  </div>
-                                ))}
+                                {studentDetail.documents.map((doc: any) => {
+                                  const statusLower = (doc.status || '').toLowerCase();
+                                  return (
+                                    <div key={doc._id || doc.id} className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
+                                      <div>
+                                        <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 capitalize mb-0.5">{(doc.document_type || '').replace(/_/g, ' ')}</p>
+                                        <div className="flex items-center justify-between mt-2">
+                                          {statusLower === 'approved' && <span className="text-xs text-emerald-600 font-semibold">✓ Approved</span>}
+                                          {statusLower === 'rejected' && <span className="text-xs text-rose-600 font-semibold">✗ Rejected</span>}
+                                          {statusLower === 'pending' && <span className="text-xs text-amber-600 font-semibold">⏳ Pending</span>}
+                                          
+                                          {doc.file_url && (
+                                            <button
+                                              onClick={() => {
+                                                setPreviewDoc({
+                                                  id: doc.id || doc._id,
+                                                  url: doc.file_url,
+                                                  type: doc.document_type || 'Document'
+                                                });
+                                                setPreviewOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-0.5 px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-750 dark:text-zinc-300 text-[10px] font-bold transition-all cursor-pointer"
+                                            >
+                                              View
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : <p className="text-xs text-zinc-400">No documents uploaded yet.</p>}
                           </div>
@@ -756,6 +805,18 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+      {previewDoc && (
+        <DocumentPreview
+          isOpen={previewOpen}
+          onClose={() => {
+            setPreviewOpen(false);
+            setPreviewDoc(null);
+          }}
+          documentId={previewDoc.id}
+          fileUrl={previewDoc.url}
+          documentType={previewDoc.type}
+        />
       )}
     </div>
   );
