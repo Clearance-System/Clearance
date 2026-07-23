@@ -54,12 +54,11 @@ export async function deleteStaff(staffId: string) {
   return response.data;
 }
 
-// PATCH /api/admin/clearance/toggle?pause=true|false
-// pause=true  → close the portal (pause clearance)
-// pause=false → open the portal (resume clearance)
-export async function toggleClearance(pause: boolean) {
-  const response = await apiClient.patch('/api/admin/clearance/toggle', null, {
-    params: { pause },
+// PATCH /api/admin/clearance/toggle — toggle clearance portal status
+// Sends JSON body: { "clearance_active": true | false }
+export async function toggleClearance(clearanceActive: boolean) {
+  const response = await apiClient.patch('/api/admin/clearance/toggle', {
+    clearance_active: clearanceActive,
   });
   return response.data;
 }

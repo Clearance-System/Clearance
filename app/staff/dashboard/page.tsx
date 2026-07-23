@@ -69,6 +69,7 @@ export default function StaffDashboard() {
   // Review modal state
   const [activeDoc, setActiveDoc] = useState<any | null>(null);
   const [remark, setRemark] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Profile setup modal state
@@ -129,6 +130,7 @@ export default function StaffDashboard() {
       queryClient.invalidateQueries({ queryKey: ['staffDocuments'] });
       setActiveDoc(null);
       setRemark('');
+      setIsRejecting(false);
       showToast('Document rejected.', 'success');
     },
     onError: (e: any) => showToast(e?.response?.data?.detail || 'Rejection failed.', 'error'),
@@ -296,12 +298,20 @@ export default function StaffDashboard() {
                     </td>
                     <td className="px-5 py-4"><StatusBadge status={doc.status} /></td>
                     <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={() => { setActiveDoc(doc); setRemark(doc.remark || ''); }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all"
-                      >
-                        <Eye className="w-3.5 h-3.5" />Review
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => { setActiveDoc(doc); setRemark(doc.remark || ''); setIsRejecting(false); }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />Review
+                        </button>
+                        <button
+                          onClick={() => { setActiveDoc(doc); setRemark(doc.remark || ''); setIsRejecting(true); }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />Reject
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -311,18 +321,20 @@ export default function StaffDashboard() {
         )}
       </div>
 
-      {/* ── Review Modal ── */}
+      {/* ── Review & Rejection Modal ── */}
       {activeDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl" style={{ animation: 'scaleUp .25s ease' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
               <div>
-                <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Review Document</h3>
+                <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                  {isRejecting ? 'Reject Document & Provide Remarks' : 'Review Document'}
+                </h3>
                 <p className="text-xs text-zinc-400">
                   {activeDoc.student?.name || activeDoc.student_name} · {activeDoc.student?.matric_number || activeDoc.matric_number}
                 </p>
               </div>
-              <button onClick={() => { setActiveDoc(null); setRemark(''); }}
+              <button onClick={() => { setActiveDoc(null); setRemark(''); setIsRejecting(false); }}
                 className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -381,19 +393,30 @@ export default function StaffDashboard() {
                 </div>
               )}
 
-              {/* Remark field */}
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                  Remark (required for rejection)
-                </label>
-                <textarea
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  rows={3}
-                  placeholder="Provide comments or reasons for rejection…"
-                  className="w-full p-3.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-zinc-800 dark:text-zinc-200"
-                />
-              </div>
+              {/* Rejection input area shown when isRejecting is true */}
+              {isRejecting ? (
+                <div className="space-y-2 p-4 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 rounded-2xl">
+                  <label className="block text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider">
+                    Rejection Remark / Reason (Required) <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    value={remark}
+                    onChange={(e) => setRemark(e.target.value)}
+                    rows={3}
+                    autoFocus
+                    placeholder="Provide clear comments or reasons for rejecting this document..."
+                    className="w-full p-3.5 bg-white dark:bg-zinc-950 border border-rose-200 dark:border-rose-900/40 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-zinc-800 dark:text-zinc-200"
+                  />
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    The student will be able to read this explanation when re-uploading their document.
+                  </p>
+                </div>
+              ) : activeDoc.remark ? (
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs">
+                  <span className="font-bold text-zinc-500 block uppercase mb-1">Previous Remark</span>
+                  <p className="text-zinc-700 dark:text-zinc-300">{activeDoc.remark}</p>
+                </div>
+              ) : null}
 
               {!hasSignature && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-900/20">
@@ -404,21 +427,43 @@ export default function StaffDashboard() {
             </div>
 
             <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 flex justify-end gap-3">
-              <button
-                disabled={rejectMutation.isPending || !remark.trim() || !hasSignature}
-                onClick={() => rejectMutation.mutate({ id: activeDoc._id || activeDoc.id, remark })}
-                className="px-4 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {rejectMutation.isPending ? 'Rejecting…' : 'Reject Document'}
-              </button>
-              <button
-                disabled={approveMutation.isPending || !hasSignature}
-                onClick={() => approveMutation.mutate(activeDoc._id || activeDoc.id)}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-600/10"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {approveMutation.isPending ? 'Approving…' : 'Approve & Sign'}
-              </button>
+              {isRejecting ? (
+                <>
+                  <button
+                    onClick={() => setIsRejecting(false)}
+                    className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={rejectMutation.isPending || !remark.trim() || !hasSignature}
+                    onClick={() => rejectMutation.mutate({ id: activeDoc._id || activeDoc.id, remark })}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-rose-600/10 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    {rejectMutation.isPending ? 'Rejecting…' : 'Confirm Rejection'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    disabled={!hasSignature}
+                    onClick={() => setIsRejecting(true)}
+                    className="px-4 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    Reject Document
+                  </button>
+                  <button
+                    disabled={approveMutation.isPending || !hasSignature}
+                    onClick={() => approveMutation.mutate(activeDoc._id || activeDoc.id)}
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-600/10 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    {approveMutation.isPending ? 'Approving…' : 'Approve & Sign'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

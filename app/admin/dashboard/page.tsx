@@ -102,8 +102,12 @@ export default function AdminDashboard() {
 
   // ── Mutations ──
   const toggleMutation = useMutation({
-    mutationFn: (pause: boolean) => toggleClearance(pause),
-    onSuccess: () => { refetchStatus(); showToast('Clearance status toggled!', 'success'); },
+    mutationFn: (clearanceActive: boolean) => toggleClearance(clearanceActive),
+    onSuccess: (data: any) => {
+      refetchStatus();
+      queryClient.invalidateQueries({ queryKey: ['adminClearanceStatus'] });
+      showToast(data?.message || 'Clearance portal status updated!', 'success');
+    },
     onError: (e: any) => showToast(e?.response?.data?.detail || 'Toggle failed.', 'error'),
   });
 
@@ -178,7 +182,7 @@ export default function AdminDashboard() {
     { id: 'upload', label: 'Upload & Export', icon: UploadCloud },
   ];
 
-  const clearanceOpen = clearanceStatus?.is_open ?? clearanceStatus?.open ?? null;
+  const clearanceOpen = clearanceStatus?.clearance_active ?? clearanceStatus?.is_open ?? clearanceStatus?.open ?? null;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -204,7 +208,7 @@ export default function AdminDashboard() {
               </p>
             </div>
             <button
-              onClick={() => toggleMutation.mutate(!!clearanceOpen)}
+              onClick={() => toggleMutation.mutate(!clearanceOpen)}
               disabled={toggleMutation.isPending || clearanceOpen === null}
               className="relative focus:outline-none disabled:opacity-50 select-none cursor-pointer"
               aria-label="Toggle Portal Status"
