@@ -18,6 +18,9 @@ interface User {
   is_approved?: boolean;
   post_held?: string;
   signature_url?: string;
+  passport_url?: string;
+  profile_completed?: boolean;
+  signature_changes?: number;
   [key: string]: any;
 }
 

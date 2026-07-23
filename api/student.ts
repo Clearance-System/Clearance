@@ -1,14 +1,23 @@
 import apiClient from './client';
 
 // POST /api/student/profile/update — multipart form data
-// Required: signature (file)
-export async function uploadStudentSignature(signatureFile: File) {
+// Accepts: signature (file), passport (file)
+export async function updateStudentProfile({ signatureFile, passportFile }: { signatureFile?: File; passportFile?: File }) {
   const formData = new FormData();
-  formData.append('signature', signatureFile);
+  if (signatureFile) {
+    formData.append('signature', signatureFile);
+  }
+  if (passportFile) {
+    formData.append('passport', passportFile);
+  }
   const response = await apiClient.post('/api/student/profile/update', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;
+}
+
+export async function uploadStudentSignature(signatureFile: File) {
+  return updateStudentProfile({ signatureFile });
 }
 
 // POST /api/student/documents/upload — multipart form data
