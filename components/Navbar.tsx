@@ -22,6 +22,7 @@ export function Navbar() {
   const links = {
     student: [
       { name: 'Dashboard', href: '/student/dashboard', icon: GraduationCap },
+      { name: 'Profile', href: '/student/profile', icon: UserIcon },
     ],
     staff: [
       { name: 'Dashboard', href: '/staff/dashboard', icon: Users2 },

@@ -12,6 +12,7 @@ import {
 import { FileUpload } from "@/components/FileUpload";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { useAuth } from "@/context/AuthProvider";
+import Link from "next/link";
 import {
   CheckCircle2,
   XCircle,
@@ -30,17 +31,18 @@ import {
   ShieldCheck,
   Lock,
   Sparkles,
-  Image as ImageIcon,
+  Plus,
+  ArrowRight,
+  ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
 
-const DOC_TYPES = [
+const REQUIRED_DOC_TYPES = [
   { id: "School Fees Receipt", name: "School Fees Receipt" },
   { id: "Acceptance Fee Receipt", name: "Acceptance Fee Receipt" },
   { id: "Library Card", name: "Library Card" },
   { id: "Student ID Card", name: "Student ID Card" },
   { id: "Departmental Form", name: "Departmental Form" },
-  { id: "Hostel Clearance", name: "Hostel Clearance" },
   { id: "Alumni Fee Receipt", name: "Alumni Fee Receipt" },
   { id: "Faculty Dues Receipt", name: "Faculty Dues Receipt" },
   { id: "Sports Council Clearance", name: "Sports Council Clearance" },
@@ -93,7 +95,10 @@ export default function StudentDashboard() {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
 
-  const [selectedDocType, setSelectedDocType] = useState(DOC_TYPES[0].id);
+  const [selectedDocType, setSelectedDocType] = useState(
+    REQUIRED_DOC_TYPES[0].id,
+  );
+  const [docFile, setDocFile] = useState<File | null>(null);
   const [toast, setToast] = useState<{
     msg: string;
     type: "success" | "error";
@@ -105,7 +110,7 @@ export default function StudentDashboard() {
     type: string;
   } | null>(null);
 
-  // Profile upload form state
+  // Profile upload form state (for incomplete profile on dashboard)
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [passportFile, setPassportFile] = useState<File | null>(null);
 
@@ -154,6 +159,24 @@ export default function StudentDashboard() {
     (d) => (d.status || "").toLowerCase() === "rejected",
   ).length;
   const total = docs.length;
+
+  // Check unique required documents uploaded
+  const uploadedDocTypes = Array.from(
+    new Set(
+      docs
+        .filter((d) => (d.status || "").toLowerCase() !== "rejected")
+        .map((d) => d.document_type || d.type),
+    ),
+  );
+
+  const missingRequiredDocs = REQUIRED_DOC_TYPES.filter(
+    (req) => !uploadedDocTypes.includes(req.id),
+  );
+
+  const uniqueRequiredUploadedCount =
+    REQUIRED_DOC_TYPES.length - missingRequiredDocs.length;
+  const all9DocsAdded = missingRequiredDocs.length === 0;
+
   const requiredCount = clearanceStatus?.required_count || 9;
   const isFullyCleared =
     !!clearanceStatus?.all_approved || approved >= requiredCount;
@@ -167,7 +190,7 @@ export default function StudentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["clearanceStatus"] });
       setSignatureFile(null);
       setPassportFile(null);
-      showToast("Profile updated successfully!", "success");
+      showToast("Profile completed successfully!", "success");
     },
     onError: (e: any) => {
       const detail = e?.response?.data?.detail;
@@ -181,36 +204,17 @@ export default function StudentDashboard() {
     },
   });
 
-  // Submit profile setup or update
+  // Submit profile setup (first time on dashboard)
   const handleProfileSubmit = () => {
-    if (!isProfileComplete) {
-      // First-time completion check: requires both signature and passport
-      const willHaveSig = !!signatureFile || hasSignature;
-      const willHavePassport = !!passportFile || hasPassport;
+    const willHaveSig = !!signatureFile || hasSignature;
+    const willHavePassport = !!passportFile || hasPassport;
 
-      if (!willHaveSig || !willHavePassport) {
-        showToast(
-          "Both signature and passport photo are required to complete your profile",
-          "error",
-        );
-        return;
-      }
-    } else {
-      // Profile already complete: allow updating either or both
-      if (!signatureFile && !passportFile) {
-        showToast(
-          "Please provide either a new signature or a new passport photo to update your profile",
-          "error",
-        );
-        return;
-      }
-      if (signatureFile && signatureLocked) {
-        showToast(
-          "You can only change your signature 2 times after initial upload",
-          "error",
-        );
-        return;
-      }
+    if (!willHaveSig || !willHavePassport) {
+      showToast(
+        "Both signature and passport photo are required to complete your profile",
+        "error",
+      );
+      return;
     }
 
     profileMutation.mutate({
@@ -226,7 +230,8 @@ export default function StudentDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myDocuments"] });
       queryClient.invalidateQueries({ queryKey: ["clearanceStatus"] });
-      showToast("Document uploaded!", "success");
+      setDocFile(null);
+      showToast("Document added successfully!", "success");
     },
     onError: (e: any) => {
       const detail = e?.response?.data?.detail;
@@ -240,12 +245,20 @@ export default function StudentDashboard() {
     },
   });
 
+  const handleAddDocument = () => {
+    if (!docFile) {
+      showToast("Please select a document file to upload first.", "error");
+      return;
+    }
+    docMutation.mutate({ type: selectedDocType, file: docFile });
+  };
+
   // Submit clearance request mutation
   const submitMutation = useMutation({
     mutationFn: submitClearanceRequest,
     onSuccess: () => {
       refetchStatus();
-      showToast("Clearance request submitted!", "success");
+      showToast("Clearance request submitted successfully!", "success");
     },
     onError: (e: any) => {
       const detail = e?.response?.data?.detail;
@@ -263,6 +276,13 @@ export default function StudentDashboard() {
     if (!isProfileComplete || !hasSignature || !hasPassport) {
       showToast(
         "Both signature and passport photo are required to complete your profile before submitting clearance.",
+        "error",
+      );
+      return;
+    }
+    if (!all9DocsAdded) {
+      showToast(
+        `All 9 required documents must be uploaded before submitting (Currently ${uniqueRequiredUploadedCount}/9 added).`,
         "error",
       );
       return;
@@ -310,7 +330,7 @@ export default function StudentDashboard() {
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  Profile Incomplete
+                  Profile Setup Incomplete
                 </span>
               )}
             </div>
@@ -336,15 +356,24 @@ export default function StudentDashboard() {
             </p>
           </div>
 
-          {/* Action shortcut to complete profile if incomplete */}
-          {!isProfileComplete && (
+          {/* Banner CTA */}
+          {isProfileComplete ? (
+            <Link
+              href="/student/profile"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold backdrop-blur-md border border-white/20 transition-all shadow-sm hover:scale-105"
+            >
+              <UserIcon className="w-4 h-4 text-indigo-300" />
+              View Profile Page
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
             <div className="bg-amber-500/15 backdrop-blur-md p-4 rounded-2xl border border-amber-400/30 text-amber-200 text-xs max-w-sm">
               <div className="flex items-center gap-2 font-bold text-amber-300 mb-1">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 Action Required
               </div>
               Both signature and passport photo are required to complete your
-              profile before clearance.
+              profile setup below before clearance submission.
             </div>
           )}
         </div>
@@ -352,7 +381,7 @@ export default function StudentDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
           {[
-            { label: "Total Docs", val: total, color: "bg-white/10" },
+            { label: "Total Uploaded", val: total, color: "bg-white/10" },
             { label: "Approved", val: approved, color: "bg-emerald-500/20" },
             { label: "Pending", val: pending, color: "bg-yellow-500/20" },
             { label: "Rejected", val: rejected, color: "bg-rose-500/20" },
@@ -372,7 +401,9 @@ export default function StudentDashboard() {
         {/* Progress bar */}
         <div className="mt-5">
           <div className="flex justify-between text-xs text-indigo-200 font-bold mb-1">
-            <span>CLEARANCE PROGRESS</span>
+            <span>
+              CLEARANCE PROGRESS ({approved} of {requiredCount} Approved)
+            </span>
             <span>{pct}%</span>
           </div>
           <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
@@ -424,190 +455,92 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Student Profile Overview Card (Passport + Signature + Details) */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-100 dark:border-zinc-800">
-          <div>
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <UserIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              Student Profile Details
-            </h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Verify your passport photo and digital signature for clearance
-              slip generation.
-            </p>
-          </div>
-          {isProfileComplete ? (
-            <span className="text-xs font-semibold px-3 py-1 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-full border border-emerald-200 dark:border-emerald-900/30">
-              Verified Media
-            </span>
-          ) : (
+      {/* CONDITIONAL RENDERING: Student Profile Details & Setup Card ONLY when profile is INCOMPLETE */}
+      {!isProfileComplete && (
+        <div className="bg-white dark:bg-zinc-900 border-2 border-amber-400/40 dark:border-amber-500/30 rounded-3xl p-6 shadow-md space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-500" />
+                Complete Profile Setup
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Both signature and passport photo are compulsory for first-time
+                profile completion.
+              </p>
+            </div>
             <span className="text-xs font-semibold px-3 py-1 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded-full border border-amber-200 dark:border-amber-900/30">
               Setup Pending
             </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          {/* Passport Photo Box */}
-          <div className="flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800">
-            <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-indigo-500" /> Passport Photo
-            </p>
-            {user?.passport_url ? (
-              <div className="relative group">
-                <img
-                  src={user.passport_url}
-                  alt="Student Passport Photo"
-                  className="w-28 h-36 object-cover rounded-xl border-2 border-indigo-500/30 shadow-md transition-transform group-hover:scale-105"
-                />
-                <span className="absolute bottom-2 right-2 p-1 bg-emerald-500 text-white rounded-full shadow-sm">
-                  <Check className="w-3 h-3" />
-                </span>
-              </div>
-            ) : (
-              <div className="w-28 h-36 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center justify-center p-3 bg-zinc-100 dark:bg-zinc-900 text-zinc-400">
-                <Camera className="w-8 h-8 mb-2 text-zinc-400" />
-                <span className="text-[11px] font-semibold">
-                  Missing Passport
-                </span>
-              </div>
-            )}
-            <p className="text-[11px] text-zinc-400 mt-2">
-              Required on Clearance Slip
-            </p>
           </div>
 
-          {/* Digital Signature Box */}
-          <div className="flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800">
-            <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <PenTool className="w-3.5 h-3.5 text-indigo-500" /> Digital
-              Signature
-            </p>
-            {user?.signature_url ? (
-              <div className="relative w-44 h-24 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-2 flex items-center justify-center shadow-inner">
-                <img
-                  src={user.signature_url}
-                  alt="Student Signature"
-                  className="max-h-full max-w-full object-contain"
-                />
-                <span className="absolute bottom-1 right-1 p-1 bg-emerald-500 text-white rounded-full shadow-sm">
-                  <Check className="w-3 h-3" />
-                </span>
-              </div>
-            ) : (
-              <div className="w-44 h-24 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center justify-center p-3 bg-zinc-100 dark:bg-zinc-900 text-zinc-400">
-                <PenTool className="w-8 h-8 mb-1 text-zinc-400" />
-                <span className="text-[11px] font-semibold">
-                  Missing Signature
-                </span>
-              </div>
-            )}
-            <p className="text-[11px] text-zinc-400 mt-2">
-              Updates used:{" "}
-              <span className="font-bold text-zinc-600 dark:text-zinc-300">
-                {signatureChanges} / 2
-              </span>
-            </p>
-          </div>
-
-          {/* Student Info Details */}
-          <div className="space-y-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800">
-            <div>
-              <p className="text-[11px] font-bold text-zinc-400 uppercase">
-                Full Name
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            {/* Passport Photo Box */}
+            <div className="flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800">
+              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-indigo-500" /> Passport
+                Photo <span className="text-rose-500">*</span>
               </p>
-              <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-                {user?.name ||
-                  `${user?.first_name || ""} ${user?.last_name || ""}`.trim() ||
-                  "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-zinc-400 uppercase">
-                Matric Number
-              </p>
-              <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                {user?.matric_number || "—"}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[11px] font-bold text-zinc-400 uppercase">
-                  Faculty
-                </p>
-                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
-                  {user?.faculty || "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-zinc-400 uppercase">
-                  Department
-                </p>
-                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
-                  {user?.department || "—"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Uploads + Documents List */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Profile Setup & Document Upload */}
-        <div className="space-y-6 lg:col-span-1">
-          {/* Profile Setup / Update Card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-5">
-            <div>
-              <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-500" />
-                {isProfileComplete
-                  ? "Update Profile Media"
-                  : "Complete Profile Setup"}
-              </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                {!isProfileComplete
-                  ? "Both signature and passport photo are required to complete your profile."
-                  : "You can update signature (max 2 times) or passport photo."}
-              </p>
-            </div>
-
-            {/* Passport Photo Upload Dropzone */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-indigo-500" />
-                Passport Photo{" "}
-                {!isProfileComplete && <span className="text-rose-500">*</span>}
-              </label>
-              <FileUpload
-                onFileSelect={(f) => setPassportFile(f)}
-                label={
-                  passportFile
-                    ? `Selected: ${passportFile.name}`
-                    : user?.passport_url
-                      ? "Replace Passport Photo"
-                      : "Upload Passport Photo"
-                }
-                accept={{ "image/*": [".png", ".jpg", ".jpeg"] }}
-              />
-            </div>
-
-            {/* Signature Upload Dropzone */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                <PenTool className="w-3.5 h-3.5 text-indigo-500" />
-                Digital Signature{" "}
-                {!isProfileComplete && <span className="text-rose-500">*</span>}
-              </label>
-              {signatureLocked ? (
-                <div className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-500 flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-amber-500" />
-                  <span>
-                    Signature change limit reached (2/2 changes used).
+              {user?.passport_url ? (
+                <div className="relative group">
+                  <img
+                    src={user.passport_url}
+                    alt="Student Passport Photo"
+                    className="w-28 h-36 object-cover rounded-xl border-2 border-indigo-500/30 shadow-md transition-transform group-hover:scale-105"
+                  />
+                  <span className="absolute bottom-2 right-2 p-1 bg-emerald-500 text-white rounded-full shadow-sm">
+                    <Check className="w-3 h-3" />
                   </span>
                 </div>
               ) : (
+                <div className="w-28 h-36 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center justify-center p-3 bg-zinc-100 dark:bg-zinc-900 text-zinc-400">
+                  <Camera className="w-8 h-8 mb-2 text-zinc-400" />
+                  <span className="text-[11px] font-semibold">
+                    Missing Passport
+                  </span>
+                </div>
+              )}
+              <div className="w-full mt-3">
+                <FileUpload
+                  onFileSelect={(f) => setPassportFile(f)}
+                  label={
+                    passportFile
+                      ? `Selected: ${passportFile.name}`
+                      : user?.passport_url
+                        ? "Replace Passport Photo"
+                        : "Upload Passport Photo"
+                  }
+                  accept={{ "image/*": [".png", ".jpg", ".jpeg"] }}
+                />
+              </div>
+            </div>
+
+            {/* Digital Signature Box */}
+            <div className="flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800">
+              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <PenTool className="w-3.5 h-3.5 text-indigo-500" /> Digital
+                Signature <span className="text-rose-500">*</span>
+              </p>
+              {user?.signature_url ? (
+                <div className="relative w-44 h-24 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-2 flex items-center justify-center shadow-inner">
+                  <img
+                    src={user.signature_url}
+                    alt="Student Signature"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                  <span className="absolute bottom-1 right-1 p-1 bg-emerald-500 text-white rounded-full shadow-sm">
+                    <Check className="w-3 h-3" />
+                  </span>
+                </div>
+              ) : (
+                <div className="w-44 h-24 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center justify-center p-3 bg-zinc-100 dark:bg-zinc-900 text-zinc-400">
+                  <PenTool className="w-8 h-8 mb-1 text-zinc-400" />
+                  <span className="text-[11px] font-semibold">
+                    Missing Signature
+                  </span>
+                </div>
+              )}
+              <div className="w-full mt-3">
                 <FileUpload
                   onFileSelect={(f) => setSignatureFile(f)}
                   label={
@@ -619,62 +552,166 @@ export default function StudentDashboard() {
                   }
                   accept={{ "image/*": [".png", ".jpg", ".jpeg"] }}
                 />
-              )}
+              </div>
             </div>
 
-            {/* Submit Button for Profile */}
-            <button
-              onClick={handleProfileSubmit}
-              disabled={profileMutation.isPending}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              {profileMutation.isPending
-                ? "Saving Profile…"
-                : isProfileComplete
-                  ? "Update Profile"
+            {/* Student Details Summary & Action */}
+            <div className="space-y-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between h-full">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold text-zinc-400 uppercase">
+                    Full Name
+                  </p>
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                    {user?.name ||
+                      `${user?.first_name || ""} ${user?.last_name || ""}`.trim() ||
+                      "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-zinc-400 uppercase">
+                    Matric Number
+                  </p>
+                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                    {user?.matric_number || "—"}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-[11px] font-bold text-zinc-400 uppercase">
+                      Faculty
+                    </p>
+                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                      {user?.faculty || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-zinc-400 uppercase">
+                      Department
+                    </p>
+                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                      {user?.department || "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleProfileSubmit}
+                disabled={profileMutation.isPending}
+                className="w-full py-3 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all shadow-md shadow-amber-600/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                {profileMutation.isPending
+                  ? "Saving Profile…"
                   : "Complete Profile Setup"}
-            </button>
+              </button>
+            </div>
           </div>
+        </div>
+      )}
 
+      {/* Main Grid: Uploads + Documents List */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Document Upload Panel */}
+        <div className="space-y-6 lg:col-span-1">
           {/* Clearance Document Upload Card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm">
-            <h3 className="font-bold text-base text-zinc-900 dark:text-white mb-1 flex items-center gap-2">
-              <UploadCloud className="w-4 h-4 text-indigo-500" />
-              Upload Clearance Document
-            </h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-              Select document type and upload your clearance document receipt.
-            </p>
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center gap-2">
+                <UploadCloud className="w-5 h-5 text-indigo-500" />
+                Add Clearance Document
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                Select document type, attach file, and click{" "}
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                  Add Document
+                </span>{" "}
+                to upload.
+              </p>
+            </div>
 
-            <div className="mb-4">
+            {/* Document Type Dropdown */}
+            <div>
               <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                Document Type
+                Select Document Type ({uniqueRequiredUploadedCount}/9 Added)
               </label>
               <select
                 value={selectedDocType}
                 onChange={(e) => setSelectedDocType(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 font-medium"
               >
-                {DOC_TYPES.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
+                {REQUIRED_DOC_TYPES.map((t) => {
+                  const isUploaded = uploadedDocTypes.includes(t.id);
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {isUploaded ? `✓ ${t.name} (Uploaded)` : t.name}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
-            <FileUpload
-              onFileSelect={(f) => {
-                docMutation.mutate({ type: selectedDocType, file: f });
-              }}
-              label={`Upload ${DOC_TYPES.find((d) => d.id === selectedDocType)?.name}`}
-            />
-            {docMutation.isPending && (
-              <p className="text-xs text-indigo-400 mt-2 animate-pulse">
-                Uploading document…
-              </p>
-            )}
+            {/* File Dropzone */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Attach File
+              </label>
+              <FileUpload
+                onFileSelect={(f) => setDocFile(f)}
+                label={
+                  docFile
+                    ? `Selected: ${docFile.name}`
+                    : `Select file for ${REQUIRED_DOC_TYPES.find((d) => d.id === selectedDocType)?.name}`
+                }
+              />
+            </div>
+
+            {/* Explicit Add Document Button */}
+            <button
+              onClick={handleAddDocument}
+              disabled={docMutation.isPending || !docFile}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4" />
+              {docMutation.isPending ? "Uploading Document…" : "Add Document"}
+            </button>
+          </div>
+
+          {/* Required Documents Checklist */}
+          <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Required Documents Checklist
+              </h4>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                {uniqueRequiredUploadedCount} / 9
+              </span>
+            </div>
+            <div className="space-y-2 text-xs">
+              {REQUIRED_DOC_TYPES.map((req) => {
+                const isUploaded = uploadedDocTypes.includes(req.id);
+                return (
+                  <div
+                    key={req.id}
+                    className={`flex items-center justify-between p-2 rounded-lg border ${
+                      isUploaded
+                        ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                    }`}
+                  >
+                    <span className="font-medium truncate">{req.name}</span>
+                    {isUploaded ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    ) : (
+                      <span className="text-[10px] font-semibold text-zinc-400 uppercase">
+                        Missing
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -682,9 +719,14 @@ export default function StudentDashboard() {
         <div className="lg:col-span-2 space-y-6">
           {/* Documents List Card */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm">
-            <h3 className="font-bold text-lg text-zinc-900 dark:text-white mb-5">
-              Submitted Documents
-            </h3>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                Submitted Documents
+              </h3>
+              <span className="text-xs text-zinc-500 font-semibold">
+                Total: {docs.length} uploaded
+              </span>
+            </div>
             {docsLoading ? (
               <div className="text-center py-12 text-zinc-400 animate-pulse">
                 Loading documents…
@@ -696,7 +738,8 @@ export default function StudentDashboard() {
                   No documents uploaded yet
                 </p>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Upload your required receipts using the panel on the left
+                  Select a document type, attach your file, and click "Add
+                  Document"
                 </p>
               </div>
             ) : (
@@ -704,51 +747,55 @@ export default function StudentDashboard() {
                 {docs.map((doc: any) => (
                   <div
                     key={doc._id || doc.id}
-                    className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20"
+                    className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 flex flex-col justify-between"
                   >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
                         <p className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm capitalize">
                           {(doc.document_type || doc.type || "").replace(
                             /_/g,
                             " ",
                           )}
                         </p>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          {doc.created_at || doc.uploaded_at
-                            ? new Date(
-                                doc.created_at || doc.uploaded_at,
-                              ).toLocaleDateString()
-                            : ""}
-                        </p>
+                        <StatusBadge status={doc.status} />
                       </div>
-                      <StatusBadge status={doc.status} />
+                      <p className="text-xs text-zinc-400">
+                        Uploaded:{" "}
+                        {doc.created_at || doc.uploaded_at
+                          ? new Date(
+                              doc.created_at || doc.uploaded_at,
+                            ).toLocaleDateString()
+                          : "Recently"}
+                      </p>
+                      {doc.remark && (
+                        <div className="mt-2 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+                          <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                            Remark:
+                          </p>
+                          <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                            {doc.remark}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    {doc.remark && (
-                      <div className="mt-2 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                        <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                          Remark:
-                        </p>
-                        <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                          {doc.remark}
-                        </p>
-                      </div>
-                    )}
+
                     {doc.file_url && (
-                      <button
-                        onClick={() => {
-                          setPreviewDoc({
-                            id: doc.id || doc._id,
-                            url: doc.file_url,
-                            type: doc.document_type || doc.type || "Document",
-                          });
-                          setPreviewOpen(true);
-                        }}
-                        className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-500 hover:underline cursor-pointer"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        View File
-                      </button>
+                      <div className="mt-3 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50">
+                        <button
+                          onClick={() => {
+                            setPreviewDoc({
+                              id: doc.id || doc._id,
+                              url: doc.file_url,
+                              type: doc.document_type || doc.type || "Document",
+                            });
+                            setPreviewOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          View Document
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -763,8 +810,8 @@ export default function StudentDashboard() {
                 Submit Clearance & Download Slip
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Complete your profile and upload all required documents to
-                submit clearance request and download slip.
+                Ensure your profile is complete and all 9 required documents are
+                added to submit clearance request.
               </p>
             </div>
 
@@ -772,8 +819,20 @@ export default function StudentDashboard() {
               <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 <span>
-                  Profile incomplete: You must upload both your signature and
-                  passport photo before submitting or downloading slip.
+                  Profile setup incomplete: You must upload both your signature
+                  and passport photo before submitting clearance.
+                </span>
+              </div>
+            )}
+
+            {!all9DocsAdded && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span>
+                  Missing required documents: You have added{" "}
+                  {uniqueRequiredUploadedCount} of 9 required documents. Upload
+                  the remaining {missingRequiredDocs.length} documents using the
+                  panel on the left.
                 </span>
               </div>
             )}
@@ -782,8 +841,8 @@ export default function StudentDashboard() {
               <div className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/20">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 <span>
-                  Some documents were rejected. Re-upload the corrected files
-                  before submitting.
+                  Some documents were rejected. Re-upload corrected files before
+                  submitting.
                 </span>
               </div>
             )}
@@ -793,21 +852,21 @@ export default function StudentDashboard() {
                 onClick={handleClearanceSubmission}
                 disabled={
                   submitMutation.isPending ||
-                  docs.length === 0 ||
+                  !all9DocsAdded ||
                   !isProfileComplete
                 }
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               >
                 <Send className="w-4 h-4" />
                 {submitMutation.isPending
-                  ? "Submitting…"
+                  ? "Submitting Request…"
                   : "Submit Clearance Request"}
               </button>
 
               <button
                 onClick={() => slipMutation.mutate()}
                 disabled={!canDownloadSlip || slipMutation.isPending}
-                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-600/10"
+                className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-600/10"
               >
                 <FileDown className="w-4 h-4" />
                 {slipMutation.isPending
@@ -819,8 +878,8 @@ export default function StudentDashboard() {
             {!canDownloadSlip && (
               <p className="text-[11px] text-zinc-400 text-center italic">
                 * Slip download is enabled once your profile setup is complete
-                (passport & signature) and all 9 required documents are
-                approved.
+                (passport & signature) and all 9 required documents are approved
+                by staff.
               </p>
             )}
           </div>
